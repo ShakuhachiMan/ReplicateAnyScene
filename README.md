@@ -17,7 +17,7 @@ Mingyuan Jia<sup>1</sup>,
 
 <!-- <h3 align="center">CVPR 2026 🔥</h3> -->
 
-<a href="https://arxiv.org/abs/2603.02133"><img src='https://img.shields.io/badge/arXiv-2603.02133-b31b1b.svg'></a> &nbsp;&nbsp;&nbsp;&nbsp;
+<a href="https://arxiv.org/abs/2604.10789"><img src='https://img.shields.io/badge/arXiv-2604.10789-b31b1b.svg'></a> &nbsp;&nbsp;&nbsp;&nbsp;
 <a href="https://xiac20.github.io/ReplicateAnyScene/"><img src='https://img.shields.io/badge/Project-Page-Green'></a> &nbsp;&nbsp;&nbsp;&nbsp;
 <a><img src='https://img.shields.io/badge/License-MIT-blue'></a> &nbsp;&nbsp;&nbsp;&nbsp;
 
@@ -27,8 +27,8 @@ Mingyuan Jia<sup>1</sup>,
 **ReplicateAnyScene:** We propose ReplicateAnyScene, a framework capable of fully automated and zero-shot transformation of casually captured videos into compositional 3D scenes.
 
 ## 📢 News
-- 🔥 [04/10/2026] We release the code for stage 2 and 3, as well as partial code for stage 1 and 5.
-- 🔥 [04/10/2026] We release "ReplicateAnyScene: Zero-Shot Video-to-3D Composition via Textual-Visual-Spatial Alignment". Check our [project page](https://xiac20.github.io/ReplicateAnyScene) and [arXiv paper](https://arxiv.org/abs/2603.02133).
+- 🔥 [04/14/2026] We release the code for stage 2 and 3, as well as partial code for stage 1 and 5.
+- 🔥 [04/14/2026] We release "ReplicateAnyScene: Zero-Shot Video-to-3D Composition via Textual-Visual-Spatial Alignment". Check our [project page](https://xiac20.github.io/ReplicateAnyScene) and [arXiv paper](https://arxiv.org/abs/2604.10789).
 
 
 ## 🌟 Pipeline
@@ -125,13 +125,13 @@ We are thankful for the following great works when implementing SimRecon:
 ## 📚Citation
 
 ```bibtex
-@misc{xia2026simreconsimreadycompositionalscene,
-  title={SimRecon: SimReady Compositional Scene Reconstruction from Real Videos}, 
-  author={Chong Xia and Kai Zhu and Zizhuo Wang and Fangfu Liu and Zhizheng Zhang and Yueqi Duan},
-  year={2026},
-  eprint={2603.02133},
-  archivePrefix={arXiv},
-  primaryClass={cs.CV},
-  url={https://arxiv.org/abs/2603.02133}, 
+@misc{dong2026replicateanyscenezeroshotvideoto3dcomposition,
+      title={ReplicateAnyScene: Zero-Shot Video-to-3D Composition via Textual-Visual-Spatial Alignment}, 
+      author={Mingyu Dong and Chong Xia and Mingyuan Jia and Weichen Lyu and Long Xu and Zheng Zhu and Yueqi Duan},
+      year={2026},
+      eprint={2604.10789},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2604.10789}, 
 }
 ```
