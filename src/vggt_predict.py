@@ -29,7 +29,9 @@ def vggt_predict(images, model):
     '''
     dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16 
     with torch.no_grad():
-        with torch.cuda.amp.autocast(dtype=dtype):
+        # 使用新接口，自动处理精度转换
+        #with torch.cuda.amp.autocast(dtype=dtype):
+        with torch.amp.autocast('cuda',dtype=dtype):   
             # Predict attributes including cameras, depth maps, and point maps.
             predictions = model(images)
     extrinsic, intrinsic = pose_encoding_to_extri_intri(predictions["pose_enc"], images.shape[-2:])

@@ -1,3 +1,6 @@
+import contextlib
+
+import torch
 from html import parser
 import numpy as np
 from PIL import Image
@@ -21,14 +24,60 @@ def segment_wall_and_floor(images, sam3_image_model):
             ...
         ]
     """
+    # 因为使用的显卡不是 Amper 架构，需要精度转换 
+    # 1. 图像预处理 
+    #processed_image = processor.preprocess(image).to("cuda") 
+ 
+    # 2. 自动判断GPU架构，选择最优对齐精度 
+    #compute_capability = torch.cuda.get_device_capability()[0] 
+    #if compute_capability >= 8:  # Ampere及以上架构 
+    #    target_dtype = torch.bfloat16 
+    #elif compute_capability >= 7:  # Turing架构 
+    #    target_dtype = torch.float16 
+    #else:  # 更旧架构 
+    #    target_dtype = torch.float32 
+ 
+    # 3. 模型和输入统一转换到目标精度（仅需执行一次，重复调用无开销） 
+    #if sam3_image_model.dtype != target_dtype: 
+    #    sam3_image_model = sam3_image_model.to(target_dtype) 
+    #processed_image = processed_image.to(target_dtype) 
+ 
+    # 4. 后续原逻辑不变 
+    #inference_state = sam3_image_model.set_image(processed_image) 
+    # 其他分割逻辑...
+
+    # 勿對整個 SAM3 .to(bfloat16)：decoder/幾何等仍會產生 float32 激活，與 bf16 Linear 權重衝突。
+    # 權重維持 float32，在 CUDA 上以 autocast 做混合精度（與官方 demo 一致），由 AMP 統一 matmul dtype。
+    def _sam3_amp_ctx():
+        if not torch.cuda.is_available() or sam3_image_model.device != "cuda":
+            return contextlib.nullcontext()
+        major, _ = torch.cuda.get_device_capability()
+        if major >= 8:
+            return torch.amp.autocast("cuda", dtype=torch.bfloat16)
+        if major >= 6:
+            return torch.amp.autocast("cuda", dtype=torch.float16)
+        return contextlib.nullcontext()
 
     wall_masks = []
     floor_masks = []
     for i, image in enumerate(images):
+        # 1. 图像预处理
+        # processed_image = processor.preprocess(image).to("cuda")
         image = Image.fromarray(image)
-        inference_state = sam3_image_model.set_image(image)
-        sam3_image_model.reset_all_prompts(inference_state)
-        inference_state = sam3_image_model.set_text_prompt(state=inference_state, prompt="single wall")
+        # 因为使用的显卡不是Amper架构，这里精度需要对齐
+        #image = processed_image.to(target_dtype)
+        #image = image.bfloat16()
+        #print(f"模型精度: {sam3_image_model.dtype}, 输入精度: {image.dtype}") 
+        
+        # In src/object_segmentation.py, before line 58
+        # image = image.float()
+
+        with _sam3_amp_ctx():
+            inference_state = sam3_image_model.set_image(image)
+            sam3_image_model.reset_all_prompts(inference_state)
+            inference_state = sam3_image_model.set_text_prompt(
+                state=inference_state, prompt="single wall"
+            )
         masks = inference_state['masks'].cpu().numpy()
         for mask in masks:
             if np.sum(mask) > 500: # Filter out small masks.
@@ -36,8 +85,11 @@ def segment_wall_and_floor(images, sam3_image_model):
                     'frame_id': i,
                     'mask': mask[0] # Remove the extra dimension.
                 })
-        sam3_image_model.reset_all_prompts(inference_state)
-        inference_state = sam3_image_model.set_text_prompt(state=inference_state, prompt="floor")
+        with _sam3_amp_ctx():
+            sam3_image_model.reset_all_prompts(inference_state)
+            inference_state = sam3_image_model.set_text_prompt(
+                state=inference_state, prompt="floor"
+            )
         masks = inference_state['masks'].cpu().numpy()
         for mask in masks:
             if np.sum(mask) > 500: # Filter out small masks.

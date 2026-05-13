@@ -2,7 +2,12 @@ from vggt.models.vggt import VGGT
 import os
 import torch
 import gc
-from transformers import AutoModelForImageTextToText, AutoProcessor
+
+#from transformers import AutoModelForImageTextToText, AutoProcessor
+# 替换原导入语句，功能与AutoModelForImageTextToText100%兼容 
+from transformers import AutoModelForVision2Seq as AutoModelForImageTextToText 
+from transformers import AutoProcessor
+
 from omegaconf import OmegaConf
 from hydra.utils import instantiate, get_method
 from scipy.spatial import Delaunay
@@ -33,7 +38,10 @@ def load_vggt_model():
     model_path = os.path.join('./models/VGGT')
     return VGGT.from_pretrained(model_path)
 
+
 def load_sam3_image_model():
+    # 保持 float32 權重；推理時在 object_segmentation 內用 autocast(bf16/fp16) 統一計算 dtype。
+    # 勿將整模組 .to(bfloat16)：ViT fused MLP、幾何 prompt、decoder 等路徑混用 fp32 激活與 bf16 權重易報錯。
     sam3_model = build_sam3_image_model(bpe_path='./sam3/sam3/assets/bpe_simple_vocab_16e6.txt.gz', checkpoint_path='./models/SAM3/sam3.pt')
     processor = Sam3Processor(sam3_model, confidence_threshold=0.5)
     return processor

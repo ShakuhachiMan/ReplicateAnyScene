@@ -1,47 +1,26 @@
-<div align="center">
-
 # ✨ReplicateAnyScene: Zero-Shot Video-to-3D Composition via Textual-Visual-Spatial Alignment✨
 
-<p align="center">
-<a href="https://dongmingyu111.github.io/">Mingyu Dong</a><sup>1,*</sup>,
-<a href="https://xiac20.github.io/">Chong Xia</a><sup>1,*</sup>,
-Mingyuan Jia<sup>1</sup>,
-<a href="https://matthew-lyu.github.io/">Weichen Lyu</a><sup>1</sup>,
-<a href="https://gaolon.github.io/xulong/">Long Xu</a><sup>2</sup>,
-<a href="https://www.zhengzhu.net/">Zheng Zhu</a><sup>1</sup>,
-<a href="https://duanyueqi.github.io/">Yueqi Duan</a><sup>1,†</sup>
-<br>
-<sup>1</sup>Tsinghua University &nbsp;
-<sup>2</sup>Zhejiang University
-</p>
+[Mingyu Dong](https://dongmingyu111.github.io/)1,*, [Chong Xia](https://xiac20.github.io/)1,*, Mingyuan Jia1, [Weichen Lyu](https://matthew-lyu.github.io/)1, [Long Xu](https://gaolon.github.io/xulong/)2, [Zheng Zhu](https://www.zhengzhu.net/)1, [Yueqi Duan](https://duanyueqi.github.io/)1,†  
+1Tsinghua University   2Zhejiang University
 
-<!-- <h3 align="center">CVPR 2026 🔥</h3> -->
+       
 
-<a href="https://arxiv.org/abs/2604.10789"><img src='https://img.shields.io/badge/arXiv-2604.10789-b31b1b.svg'></a> &nbsp;&nbsp;&nbsp;&nbsp;
-<a href="https://xiac20.github.io/ReplicateAnyScene/"><img src='https://img.shields.io/badge/Project-Page-Green'></a> &nbsp;&nbsp;&nbsp;&nbsp;
-<a><img src='https://img.shields.io/badge/License-MIT-blue'></a> &nbsp;&nbsp;&nbsp;&nbsp;
+       
 
-![Teaser Visualization](assets/teaser.png)
-</div>
+     Teaser Visualization
 
 **ReplicateAnyScene:** We propose ReplicateAnyScene, a framework capable of fully automated and zero-shot transformation of casually captured videos into compositional 3D scenes.
 
 ## 📢 News
+
 - 🔥 [04/14/2026] We release the code for stage 2 and 3, as well as partial code for stage 1 and 5.
 - 🔥 [04/14/2026] We release "ReplicateAnyScene: Zero-Shot Video-to-3D Composition via Textual-Visual-Spatial Alignment". Check our [project page](https://xiac20.github.io/ReplicateAnyScene) and [arXiv paper](https://arxiv.org/abs/2604.10789).
 
-
 ## 🌟 Pipeline
 
-![Pipeline Visualization](assets/pipeline.png)
+Pipeline Visualization
 
-<strong>The overall framework of our approach ReplicateAnyScene.</strong> Our pipeline consists of a five-stage cascade where each stage is specifically designed to resolve targeted alignment gaps among our three core modalities including **textual (green), visual (orange), and spatial (blue)**. The gradient backgrounds and multi-colored dashed borders within each module explicitly illustrate the specific cross-modal alignment process occurring at that step.
-
-<!-- ## 🎨 Video Demos
-
-<video width="100%" controls autoplay loop muted>
-  <source src="assets/demo.mp4" type="video/mp4">
-</video> -->
+**The overall framework of our approach ReplicateAnyScene.** Our pipeline consists of a five-stage cascade where each stage is specifically designed to resolve targeted alignment gaps among our three core modalities including **textual (green), visual (orange), and spatial (blue)**. The gradient backgrounds and multi-colored dashed borders within each module explicitly illustrate the specific cross-modal alignment process occurring at that step.
 
 ## ⚙️ Setup
 
@@ -63,7 +42,7 @@ conda deactivate
 conda activate ReplicateAnyScene
 ```
 
-2. **Install SAM3D-related dependencies**
+1. **Install SAM3D-related dependencies**
 
 ```bash
 cd sam-3d-objects
@@ -84,7 +63,7 @@ pip install -e '.[inference]'
 cd ../ # back to root
 ```
 
-3. **Install SAM3,VGGT,and other dependencies**
+1. **Install SAM3,VGGT,and other dependencies**
 
 ```bash
 cd sam3
@@ -95,7 +74,7 @@ cd ..
 pip install colorcet
 ```
 
-4. **Download required models.**
+1-A. **Download required models(Huggingface).**
 
 ```bash
 mkdir models
@@ -104,17 +83,39 @@ hf download facebook/sam3 --local-dir models/SAM3
 hf download facebook/sam-3d-objects --local-dir models/SAM3D
 ```
 
-## 💻Run Examples
+1-B. **Download required models(ModelScope).**
 
+```bash
+mkdir models
+modelscope download --model facebook/VGGT-1B --local_dir models/VGGT
+modelscope download --model facebook/sam3 --local_dir models/SAM3
+modelscope download --model facebook/sam-3d-objects --local_dir models/SAM3D
+```
+
+## 💻Run Examples(Default)
+
+！以下是原始执行命令，但是没有48GB VRAM 不推荐执行下面，我用32GB VRAM 等待了很久没有返回：  
 We provide an example scene to help you get started.
 
 ```bash
 python main.py --input_video ./assets/example/hallway.mp4 --output_path ./outputs/hallway --category_path ./assets/example/hallway.json --max_frames 160
 ```
+
 - `--input_video`: Path to the input video file or a directory containing image frames.
 - `--output_path`: Directory where the output results will be saved.
 - `--category_path`: Path to the JSON file containing category and relation information for the scene.
 - `--max_frames`: Maximum number of frames to process from the video. The default value is set to 160 for a GPU with 48GB VRAM. You can adjust this value based on your hardware capabilities.
+
+## 💻Run Examples(4080 Super 32 GB VRAM)
+
+```bash
+python main.py --input_video ./assets/example/hallway.mp4 --output_path ./outputs/hallway --category_path ./assets/example/hallway.json --max_frames 80
+```
+
+- `--input_video`: Path to the input video file or a directory containing image frames.
+- `--output_path`: Directory where the output results will be saved.
+- `--category_path`: Path to the JSON file containing category and relation information for the scene.
+- `--max_frames`: Maximum number of frames to process from the video. The default value is set to 80 for a GPU with 32GB VRAM. You can adjust this value based on your hardware capabilities.
 
 ## 🔗Acknowledgement
 
@@ -135,3 +136,4 @@ We are thankful for the following great works when implementing SimRecon:
       url={https://arxiv.org/abs/2604.10789}, 
 }
 ```
+
