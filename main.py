@@ -196,6 +196,8 @@ def main(args):
                     continue
 
         # save the final results（可選：網格局部原點置於幾何中心，再寫入 GLB）
+        # 勿對網格先 apply_transform(T) 再 add_geometry：否則頂點已是世界座標、節點矩陣為單位，
+        # DCC 裡「物件原點」仍會在場景原點，與幾何中心分離。應以 transform= 傳入 T，保留局部網格。
         scene = trimesh.Scene()
         for category, category_instances in all_instances.items():
             for i, instance_info in enumerate(category_instances):
@@ -204,9 +206,13 @@ def main(args):
                 mesh = instance_info["original_mesh"]
                 if mesh is None:
                     continue
-                transformed_mesh = mesh.copy()
-                transformed_mesh.apply_transform(instance_info["T"])
-                scene.add_geometry(transformed_mesh, node_name=f"{category}_{i}")
+                mesh_to_add = mesh.copy()
+                T = np.asarray(instance_info["T"], dtype=np.float64)
+                scene.add_geometry(
+                    mesh_to_add,
+                    node_name=f"{category}_{i}",
+                    transform=T,
+                )
         # z-up to y-up
         scene.apply_transform(np.array([[1, 0, 0, 0],[0, 0, 1, 0],[0, -1, 0, 0],[0, 0, 0, 1]]))
         scene.export(os.path.join(args.output_path, "final_scene.glb"))
