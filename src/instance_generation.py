@@ -104,16 +104,20 @@ def _generate_all_instances_worker(
 
         inference = Inference(config_file=config_file, compile=compile_model)
         all_instances = {}
+        total_inst = sum(len(m) for m in deduplicated_all_masks.values())
+        done_inst = 0
         for category, category_masks in deduplicated_all_masks.items():
             all_instances[category] = []
             for instance_masks, optimal_frame_id in zip(category_masks, all_optimal_frame_ids[category]):
+                done_inst += 1
                 image = colors[optimal_frame_id]
                 mask = next(im["mask"] for im in instance_masks if im["frame_id"] == optimal_frame_id)
                 pointmap = world_points[optimal_frame_id]
                 extrinsic = extrinsics[optimal_frame_id]
                 print(
-                    f"[SAM3D subprocess] category={category}, frame={optimal_frame_id}, "
-                    f"mask_sum={int(np.asarray(mask).sum())}"
+                    f"[SAM3D subprocess] ({done_inst}/{total_inst}) category={category}, "
+                    f"frame={optimal_frame_id}, mask_sum={int(np.asarray(mask).sum())}",
+                    flush=True,
                 )
                 instance_result = generate_3d_asset(image, mask, pointmap, extrinsic, inference)
                 all_instances[category].append(instance_result)

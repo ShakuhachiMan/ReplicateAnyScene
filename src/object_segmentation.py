@@ -5,6 +5,8 @@ from html import parser
 import numpy as np
 from PIL import Image
 
+from src.pipeline_progress import cuda_cache_clear, frame_progress
+
 def segment_wall_and_floor(images, sam3_image_model):
     """
     Use SAM3 to segment wall and floor from the input images.
@@ -60,7 +62,9 @@ def segment_wall_and_floor(images, sam3_image_model):
 
     wall_masks = []
     floor_masks = []
+    n = len(images)
     for i, image in enumerate(images):
+        frame_progress(i, n, "SAM3 牆/地分割")
         # 1. 图像预处理
         # processed_image = processor.preprocess(image).to("cuda")
         image = Image.fromarray(image)
@@ -97,19 +101,33 @@ def segment_wall_and_floor(images, sam3_image_model):
                     'frame_id': i,
                     'mask': mask[0] # Remove the extra dimension.
                 })
+        if torch.cuda.is_available() and (i + 1) % 20 == 0:
+            cuda_cache_clear(f"wall/floor 每 20 幀 ({i+1}/{n})")
     return wall_masks, floor_masks
 
 def propagate_in_video(predictor, session_id):
     # we will just propagate from frame 0 to the end of the video
+    from src.pipeline_progress import log
+
     outputs_per_frame = {}
-    for response in predictor.handle_stream_request(
-        request=dict(
-            type="propagate_in_video",
-            session_id=session_id,
+    for k, response in enumerate(
+        predictor.handle_stream_request(
+            request=dict(
+                type="propagate_in_video",
+                session_id=session_id,
+            )
         )
     ):
-        outputs_per_frame[response["frame_index"]] = response["outputs"]
-
+        idx = response["frame_index"]
+        outputs_per_frame[idx] = response["outputs"]
+        if (k + 1) % 20 == 0:
+            log(
+                f"[ReplicateAnyScene] SAM3 video propagate 串流中… 已處理 {k+1} 條回應，"
+                f"目前 frame_index={idx}，不同幀數={len(outputs_per_frame)}"
+            )
+    log(
+        f"[ReplicateAnyScene] SAM3 video propagate 結束，共 {len(outputs_per_frame)} 幀有輸出"
+    )
     return outputs_per_frame
 
 def segment_and_track(category, video_predictor, session_id):
@@ -133,11 +151,17 @@ def segment_and_track(category, video_predictor, session_id):
             ...
         ]
     '''
+    from src.pipeline_progress import log
+
+    log(
+        f"[ReplicateAnyScene] SAM3 video：類別「{category}」開始（reset_session + add_prompt + propagate）"
+    )
     # Reset session and add text prompt for the category to segment
     _ = video_predictor.handle_request(request=dict(type="reset_session", session_id=session_id))
     video_predictor.handle_request(request=dict(type="add_prompt", session_id=session_id, frame_index=0, text=category))
     outputs_per_frame = propagate_in_video(video_predictor, session_id)
     if not outputs_per_frame:
+        log(f"[ReplicateAnyScene] SAM3 video：類別「{category}」無輸出")
         return []
 
     # Collect all object IDs across frames, discontinuous segments will be split into different instances.
@@ -185,4 +209,7 @@ def segment_and_track(category, video_predictor, session_id):
             if instance_track:
                 final_results.append(instance_track)
 
+    log(
+        f"[ReplicateAnyScene] SAM3 video：類別「{category}」完成，得到 {len(final_results)} 條實例軌跡"
+    )
     return final_results

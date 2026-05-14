@@ -11,6 +11,8 @@ from vggt.utils.geometry import unproject_depth_map_to_point_map
 import cv2
 from PIL import Image
 from src.geometry_utils import predictions_to_pcd
+from src.pipeline_progress import cuda_cache_clear, log
+
 
 def vggt_predict(images, model):
     '''
@@ -28,6 +30,11 @@ def vggt_predict(images, model):
         - intrinsic: numpy array of shape (3, 3)
     '''
     dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16 
+    s = images.shape[0]
+    log(
+        f"[ReplicateAnyScene] VGGT 前向：batch 幀數 S={s}, 空間 {tuple(images.shape[-2:])} | "
+        f"autocast dtype={dtype}"
+    )
     with torch.no_grad():
         # 使用新接口，自动处理精度转换
         #with torch.cuda.amp.autocast(dtype=dtype):
@@ -66,6 +73,8 @@ def vggt_predict(images, model):
     world_points = predictions['world_points_from_depth'].copy()
     world_points_conf = predictions['world_points_conf'].copy()
     intrinsic = np.mean(predictions['intrinsic'], axis=0)
+
+    cuda_cache_clear("VGGT 前向結束，釋放中間張量後")
 
     return {
         "point_cloud_data": point_cloud_data,

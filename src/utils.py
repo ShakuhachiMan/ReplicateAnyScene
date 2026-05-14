@@ -8,6 +8,31 @@ import colorcet as cc
 import matplotlib.colors as mcolors
 import cv2
 
+from src.pipeline_progress import log, timed_stage
+
+
+def _ffprobe_duration_seconds(video_path: str):
+    """Return container duration in seconds, or None if unavailable."""
+    try:
+        out = subprocess.check_output(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                video_path,
+            ],
+            stderr=subprocess.DEVNULL,
+            timeout=120,
+        )
+        return float(out.decode().strip())
+    except (subprocess.CalledProcessError, ValueError, FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+
 def load_video_frames(video_path, max_frames):
     '''
     Load uniformly sampled frames from a video file or directory of images.
@@ -26,14 +51,52 @@ def load_video_frames(video_path, max_frames):
             images = [os.path.join(video_path, img) for img in images]
         return load_and_preprocess_images(images)
     else:
-        # Use ffmpeg to extract frames from the video in a temporary directory
+        # Prefer extracting only ~max_frames evenly over the timeline (avoids dumping every frame to disk).
         with tempfile.TemporaryDirectory() as temp_dir:
-            subprocess.run(
-                ["ffmpeg", "-i", video_path, "-vsync", "0", os.path.join(temp_dir, "frame_%04d.png")],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=True,
-            )
+            pattern = os.path.join(temp_dir, "frame_%04d.png")
+            dur = _ffprobe_duration_seconds(video_path)
+            if dur and dur > 0 and max_frames > 0:
+                fps = max_frames / dur
+                with timed_stage(
+                    "ffmpeg 抽幀",
+                    f"max_frames={max_frames}, duration≈{dur:.2f}s, vf fps={fps:.4f}",
+                ):
+                    subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-y",
+                            "-i",
+                            video_path,
+                            "-vf",
+                            f"fps={fps}",
+                            "-frames:v",
+                            str(max_frames),
+                            pattern,
+                        ],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=True,
+                    )
+            else:
+                log(
+                    "[ReplicateAnyScene] ffprobe 不可用或時長未知，退回「抽出全部幀再抽樣」"
+                    "（長影片會很慢且佔磁碟）。"
+                )
+                with timed_stage("ffmpeg 抽幀（全幀，較慢）", video_path):
+                    subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-y",
+                            "-i",
+                            video_path,
+                            "-vsync",
+                            "0",
+                            pattern,
+                        ],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=True,
+                    )
             return load_video_frames(temp_dir, max_frames)
         
 def get_glasbey_colors(n):

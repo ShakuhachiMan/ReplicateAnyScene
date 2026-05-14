@@ -242,10 +242,10 @@ def cross_category_deduplicate(all_masks, world_points, world_points_conf, conf_
     print(f"  Comparing {N} instances globally...")
     uf = UnionFind(range(N))
     
+    # 須對每一對 (i,j) 都算 overlap 並存入 matrix：若在迴圈中因已同組而 skip，
+    # 之後 Union-Find 傳遞合併後，同組內仍可能出現從未算過的邊，導致 KeyError。
     for i in range(N):
         for j in range(i + 1, N):
-            if uf.find(i) == uf.find(j): 
-                continue
             pts_i = all_candidates[i]["points"]
             pts_j = all_candidates[j]["points"]
             
