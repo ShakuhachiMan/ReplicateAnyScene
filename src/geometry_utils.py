@@ -406,3 +406,42 @@ def get_walls_info(world_points, wall_masks):
             })
 
     return clustered_walls
+
+
+def apply_mesh_geometry_center_to_local_origin(instance_info):
+    """
+    將 reconstructed mesh 的頂點平移，使幾何中心（頂點平均）落在網格局部原點，
+    並把 instance_info['T'] 更新為 T @ C（C 為「新局部 → 舊局部」的平移），
+    使 apply_transform(T) 後的世界座標與平移前一致。
+
+    支援 trimesh.Trimesh 或 trimesh.Scene（例如 GLB 多節點）。
+    """
+    mesh = instance_info.get("original_mesh")
+    if mesh is None:
+        return instance_info
+
+    T = np.asarray(instance_info["T"], dtype=np.float64)
+    if T.shape != (4, 4):
+        return instance_info
+
+    if isinstance(mesh, trimesh.Scene):
+        dumped = mesh.dump(concatenate=True)
+        if dumped is None or len(getattr(dumped, "vertices", [])) == 0:
+            return instance_info
+        centroid = np.asarray(dumped.vertices, dtype=np.float64).mean(axis=0)
+        mesh_out = mesh.copy()
+        mesh_out.apply_translation(-centroid)
+    elif isinstance(mesh, trimesh.Trimesh):
+        if len(mesh.vertices) == 0:
+            return instance_info
+        centroid = np.asarray(mesh.vertices, dtype=np.float64).mean(axis=0)
+        mesh_out = mesh.copy()
+        mesh_out.apply_translation(-centroid)
+    else:
+        return instance_info
+
+    C = np.eye(4, dtype=np.float64)
+    C[:3, 3] = centroid
+    instance_info["original_mesh"] = mesh_out
+    instance_info["T"] = (T @ C).astype(np.float32)
+    return instance_info

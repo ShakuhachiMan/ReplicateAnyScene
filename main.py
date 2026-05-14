@@ -10,7 +10,7 @@ import sys
 
 from src.models import load_vggt_model, load_sam3_image_model, load_sam3_video_model, unload_model
 from src.utils import load_video_frames, vis_instance_masks
-from src.geometry_utils import align_to_room_coordinate_system, align_vggt_predictions, get_optimal_view_frame_id, get_walls_info
+from src.geometry_utils import align_to_room_coordinate_system, align_vggt_predictions, get_optimal_view_frame_id, get_walls_info, apply_mesh_geometry_center_to_local_origin
 from src.vggt_predict import vggt_predict
 from src.object_segmentation import segment_wall_and_floor, segment_and_track
 from src.sg_deduplication import self_category_deduplicate, cross_category_deduplicate
@@ -195,13 +195,17 @@ def main(args):
                 else:
                     continue
 
-        # save the final results
+        # save the final results（可選：網格局部原點置於幾何中心，再寫入 GLB）
         scene = trimesh.Scene()
         for category, category_instances in all_instances.items():
             for i, instance_info in enumerate(category_instances):
-                mesh = instance_info['original_mesh']
+                if not args.no_center_mesh_at_geometry:
+                    apply_mesh_geometry_center_to_local_origin(instance_info)
+                mesh = instance_info["original_mesh"]
+                if mesh is None:
+                    continue
                 transformed_mesh = mesh.copy()
-                transformed_mesh.apply_transform(instance_info['T'])
+                transformed_mesh.apply_transform(instance_info["T"])
                 scene.add_geometry(transformed_mesh, node_name=f"{category}_{i}")
         # z-up to y-up
         scene.apply_transform(np.array([[1, 0, 0, 0],[0, 0, 1, 0],[0, -1, 0, 0],[0, 0, 0, 1]]))
@@ -216,6 +220,12 @@ if __name__ == "__main__":
     parser.add_argument("--output_path", type=str, default='./outputs/hallway', help="Directory to save output results")
     parser.add_argument("--category_path", type=str, default='./assets/example/hallway.json', help="path to category and relation json")
     parser.add_argument("--max_frames", type=int, default=160, help="Maximum number of frames to process from the video")
+    parser.add_argument(
+        "--no_center_mesh_at_geometry",
+        action="store_true",
+        help="預設會把每個重建網格的頂點平移到幾何中心為局部原點並同步更新 T；"
+        "若加此旗標則維持 SAM3D 原始局部座標（原點多在場景原點附近）。",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.input_video):
