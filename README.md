@@ -92,6 +92,20 @@ modelscope download --model facebook/sam3 --local_dir models/SAM3
 modelscope download --model facebook/sam-3d-objects --local_dir models/SAM3D
 ```
 
+1. **Download DINO V2 git source.**
+
+```bash
+# 1. 只 clone 一次（本機常駐）
+git clone https://github.com/facebookresearch/dinov2.git ~/dinov2
+# 2. 每次跑腳本前 export（可寫進 ~/.bashrc 或 conda activate 腳本）
+export SAM3D_DINOV2_LOCAL_REPO=$HOME/dinov2
+# 或通用名稱亦可：
+# export DINOV2_LOCAL_REPO=$HOME/dinov2
+
+# 3. （可選）固定 hub 快取目錄，方便備份/避免容器內重下
+export TORCH_HUB_DIR=$HOME/.cache/torch/hub
+```
+
 ## 💻Run Examples(Default)
 
 ！以下是原始执行命令，但是没有48GB VRAM 不推荐执行下面，我用32GB VRAM 等待了很久没有返回：  
@@ -116,6 +130,7 @@ python main.py --input_video ./assets/example/hallway.mp4 --output_path ./output
 - `--output_path`: Directory where the output results will be saved.
 - `--category_path`: Path to the JSON file containing category and relation information for the scene.
 - `--max_frames`: Maximum number of frames to process from the video. The default value is set to 80 for a GPU with 32GB VRAM. You can adjust this value based on your hardware capabilities.
+- `--no_center_mesh_at_geometry`: 设置场景中心作为重建模型的坐标中心。
 
 ## 🔗Acknowledgement
 
