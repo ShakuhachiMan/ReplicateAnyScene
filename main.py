@@ -168,8 +168,58 @@ def main(args):
         )
     cuda_cache_clear("SAM3D 子進程返回後（主進程）")
 
-    # stage 4: Iterative Visual-Spatial Alignment
-    # This part of the code is not publicly available for now.
+    # Stage4 前備份每個實例的 4×4 T（粗對齊 / SAM3D 子進程回傳後），供與 Stage4 後對照
+    _stage4_log_key = "_T_before_stage4"
+    if getattr(args, "stage4", False):
+        for _cat, _instances in all_instances.items():
+            for _inst in _instances:
+                _inst[_stage4_log_key] = np.asarray(_inst["T"], dtype=np.float64).copy()
+
+    # stage 4: Iterative Visual–Spatial Alignment（可選：見 src/Stage4Refiner.py 說明）
+    if getattr(args, "stage4", False):
+        from src.Stage4Refiner import run_stage4_on_instances
+
+        with timed_stage(
+            "Stage4 視覺-空間對齊（mask 投影粗搜尋 yaw）",
+            f"yaw=±{args.stage4_yaw_range_deg}° steps={args.stage4_n_yaw}",
+        ):
+            run_stage4_on_instances(
+                all_instances,
+                all_optimal_frame_ids,
+                deduplicated_all_masks,
+                vggt_prediction_results["colors"],
+                vggt_prediction_results["extrinsics"],
+                vggt_prediction_results["intrinsic"],
+                n_vertices_sample=args.stage4_vertex_samples,
+                yaw_range_deg=args.stage4_yaw_range_deg,
+                n_yaw=args.stage4_n_yaw,
+                seed=getattr(args, "stage4_seed", 0),
+            )
+
+    # 輸出每個實例的粗對齊 T 與 Stage4 後 T（JSON 字串欄位為 4×4 矩陣的 json.dumps(tolist())）
+    transform_compare = []
+    for _category in sorted(all_instances.keys()):
+        for _idx, _info in enumerate(all_instances[_category]):
+            _T_after = np.asarray(_info["T"], dtype=np.float64)
+            if _stage4_log_key in _info:
+                _T_before = np.asarray(_info[_stage4_log_key], dtype=np.float64)
+                del _info[_stage4_log_key]
+            else:
+                _T_before = _T_after.copy()
+            transform_compare.append(
+                {
+                    "id": f"{_category}_{_idx}",
+                    "origin_transform": json.dumps(_T_before.tolist()),
+                    "stage4_transform": json.dumps(_T_after.tolist()),
+                }
+            )
+    _compare_path = os.path.join(args.output_path, "instance_transforms_stage4.json")
+    with open(_compare_path, "w", encoding="utf-8") as _f:
+        json.dump(transform_compare, _f, ensure_ascii=False, indent=2)
+    log(
+        f"[ReplicateAnyScene] 實例變換對照（粗對齊 vs Stage4 後）已寫入 {_compare_path} | n={len(transform_compare)}"
+    )
+    print(json.dumps(transform_compare, ensure_ascii=False))
 
     # stage 5: Semantic-Aware Scene Refinement
     # The code for this stage is not publicly available for now.
@@ -231,6 +281,35 @@ if __name__ == "__main__":
         action="store_true",
         help="預設會把每個重建網格的頂點平移到幾何中心為局部原點並同步更新 T；"
         "若加此旗標則維持 SAM3D 原始局部座標（原點多在場景原點附近）。",
+    )
+    parser.add_argument(
+        "--stage4",
+        action="store_true",
+        help="啟用簡化 Stage4：在最佳視角以實例 mask 為參考，對繞世界 Z、過物體中心的 yaw 做粗搜尋並更新 T（非論文完整 render-match-optimize）。",
+    )
+    parser.add_argument(
+        "--stage4_yaw_range_deg",
+        type=float,
+        default=40.0,
+        help="Stage4 yaw 搜尋半徑（度）。",
+    )
+    parser.add_argument(
+        "--stage4_n_yaw",
+        type=int,
+        default=17,
+        help="Stage4 yaw 網格點數（含端點，建議奇數以便含 0°）。",
+    )
+    parser.add_argument(
+        "--stage4_vertex_samples",
+        type=int,
+        default=2048,
+        help="Stage4 從網格隨機抽樣的頂點數（用於投影打分）。",
+    )
+    parser.add_argument(
+        "--stage4_seed",
+        type=int,
+        default=0,
+        help="Stage4 隨機抽樣種子。",
     )
     args = parser.parse_args()
 
