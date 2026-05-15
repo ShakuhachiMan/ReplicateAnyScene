@@ -174,10 +174,18 @@ python main.py --input_video ./assets/example/hallway.mp4 --output_path ./output
 python main.py --input_video ./assets/example/hallway.mp4 --output_path ./outputs/hallway --category_path ./assets/example/hallway.json --max_frames 80
 ```
 
-啟用 Stage4 時可在上述命令末尾追加，例如：
+啟用 **方案 A（SAM3D render–match–optimize）** 時追加 `--sam3d_layout_postprocess`（在 SAM3D 子進程內對每個實例做可微輪廓對齊，優化 rotation/translation/scale）：
 
 ```bash
-python main.py ... --max_frames 80 --stage4 --stage4_yaw_range_deg 40 --stage4_n_yaw 17
+python main.py --input_video ./assets/example/hallway.mp4 --output_path ./outputs/hallway --category_path ./assets/example/hallway.json --max_frames 80 --sam3d_layout_postprocess
+```
+
+子進程日誌中若優化被接受，會出現 `[SAM3D layout_post] mask IoU after render-compare: ...` 以及 `Running mesh layout post optimization method...` / `Finished mesh post-optimization!`。
+
+啟用簡化 Stage4（僅 yaw 粗搜尋，與方案 A 不同）時可再追加，例如：
+
+```bash
+python main.py ... --max_frames 80 --sam3d_layout_postprocess --stage4 --stage4_yaw_range_deg 40 --stage4_n_yaw 17
 ```
 
 **通用參數**
@@ -187,6 +195,7 @@ python main.py ... --max_frames 80 --stage4 --stage4_yaw_range_deg 40 --stage4_n
 - `--category_path`: Path to the JSON file containing category and relation information for the scene.
 - `--max_frames`: Maximum number of frames to process from the video. The default value is set to 80 for a GPU with 32GB VRAM. You can adjust this value based on your hardware capabilities.
 - `--no_center_mesh_at_geometry`: 預設會把每個重建網格平移到**幾何中心**為局部原點並同步更新 `T`；加上此旗標則維持 SAM3D 原始局部座標（原點多在場景原點附近）。
+- `--sam3d_layout_postprocess`: 啟用 SAM3D 內建 **layout post-optimization**（方案 A：單幀可微 silhouette + 6DoF 量級的 `quat/t/scale` 梯度優化）。預設關閉；與 `--stage4` 可同時開啟但職責重疊，驗證方案 A 時建議先只開此旗標。
 
 **Stage4 可選參數**（需加 `--stage4`；實作見 `src/Stage4Refiner.py`）
 

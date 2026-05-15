@@ -158,13 +158,17 @@ def main(args):
         "[ReplicateAnyScene] SAM3D 子進程：單次 queue 等待最長 7200s；"
         "子進程內會列印 (done/total) 進度。"
     )
-    with timed_stage("SAM3D 子進程：生成所有實例網格"):
+    with timed_stage(
+        "SAM3D 子進程：生成所有實例網格",
+        "layout_post=on" if getattr(args, "sam3d_layout_postprocess", False) else "layout_post=off",
+    ):
         all_instances = generate_3d_asset_in_subprocess(
             deduplicated_all_masks,
             all_optimal_frame_ids,
             vggt_prediction_results['colors'],
             vggt_prediction_results['world_points'],
             vggt_prediction_results['extrinsics'],
+            with_layout_postprocess=getattr(args, "sam3d_layout_postprocess", False),
         )
     cuda_cache_clear("SAM3D 子進程返回後（主進程）")
 
@@ -281,6 +285,12 @@ if __name__ == "__main__":
         action="store_true",
         help="預設會把每個重建網格的頂點平移到幾何中心為局部原點並同步更新 T；"
         "若加此旗標則維持 SAM3D 原始局部座標（原點多在場景原點附近）。",
+    )
+    parser.add_argument(
+        "--sam3d_layout_postprocess",
+        action="store_true",
+        help="啟用 SAM3D 內建 layout post-optimization（render–match–optimize：可微輪廓渲染 + "
+        "優化 rotation/translation/scale）。在最佳視角單幀上執行，耗時與顯存高於預設關閉時。",
     )
     parser.add_argument(
         "--stage4",

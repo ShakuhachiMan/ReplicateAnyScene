@@ -9,7 +9,7 @@ from pathlib import Path
 from pytorch3d.transforms import quaternion_to_matrix
 from sam3d_objects.data.dataset.tdfy.transforms_3d import compose_transform
 
-def generate_3d_asset(image, mask, pointmap, extrinsic, inference):
+def generate_3d_asset(image, mask, pointmap, extrinsic, inference, with_layout_postprocess=False):
     '''
     3D asset generation for a single object instance using sam3d. 
     Args:
@@ -32,7 +32,15 @@ def generate_3d_asset(image, mask, pointmap, extrinsic, inference):
     points_cam_flat = points_cam_hom[:, :3]
     point_map_camera = torch.from_numpy(points_cam_flat).reshape(H, W, 3).to(torch.float32)
     point_map_camera = point_map_camera.contiguous()
-    output = inference(image, mask, seed=42, pointmap=point_map_camera)
+    output = inference(
+        image,
+        mask,
+        seed=42,
+        pointmap=point_map_camera,
+        with_layout_postprocess=with_layout_postprocess,
+    )
+    if with_layout_postprocess and "iou" in output:
+        print(f"[SAM3D layout_post] mask IoU after render-compare: {output['iou']}", flush=True)
     original_mesh = output["glb"]
 
     # get the transformation matrix. The transformation is z-up.
@@ -54,7 +62,9 @@ def generate_3d_asset(image, mask, pointmap, extrinsic, inference):
     }
 
 
-def _generate_3d_asset_worker(queue, image, mask, pointmap, extrinsic, config_file, compile_model):
+def _generate_3d_asset_worker(
+    queue, image, mask, pointmap, extrinsic, config_file, compile_model, with_layout_postprocess
+):
     try:
         repo_root = Path(__file__).resolve().parents[1]
         import sys
@@ -71,7 +81,9 @@ def _generate_3d_asset_worker(queue, image, mask, pointmap, extrinsic, config_fi
         Inference = module.Inference
 
         inference = Inference(config_file=config_file, compile=compile_model)
-        result = generate_3d_asset(image, mask, pointmap, extrinsic, inference)
+        result = generate_3d_asset(
+            image, mask, pointmap, extrinsic, inference, with_layout_postprocess
+        )
         queue.put((True, result))
     except Exception:
         queue.put((False, traceback.format_exc()))
@@ -86,6 +98,7 @@ def _generate_all_instances_worker(
     extrinsics,
     config_file,
     compile_model,
+    with_layout_postprocess,
 ):
     try:
         repo_root = Path(__file__).resolve().parents[1]
@@ -119,7 +132,9 @@ def _generate_all_instances_worker(
                     f"frame={optimal_frame_id}, mask_sum={int(np.asarray(mask).sum())}",
                     flush=True,
                 )
-                instance_result = generate_3d_asset(image, mask, pointmap, extrinsic, inference)
+                instance_result = generate_3d_asset(
+                    image, mask, pointmap, extrinsic, inference, with_layout_postprocess
+                )
                 all_instances[category].append(instance_result)
         print("[SAM3D subprocess] finished generating all instances, putting results in the queue. This may take a while...")
         queue.put((True, all_instances))
@@ -138,6 +153,7 @@ def generate_3d_asset_in_subprocess(
     extrinsics,
     config_file="./models/SAM3D/checkpoints/pipeline.yaml",
     compile_model=False,
+    with_layout_postprocess=False,
 ):
     ctx = mp.get_context("spawn")
     queue = ctx.Queue()
@@ -152,6 +168,7 @@ def generate_3d_asset_in_subprocess(
             extrinsics,
             config_file,
             compile_model,
+            with_layout_postprocess,
         ),
     )
     process.start()
